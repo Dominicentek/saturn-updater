@@ -33,8 +33,8 @@ typedef void(*DownloadFinishCallback)(bool success);
 #define SCREEN_NO_INTERNET 9
 #define SCREEN_CHOOSE_ROM 10
 
-#define REPO_OWNER "Dominicentek"
-#define REPO_NAME  "SuperMarioJava"
+#define REPO_OWNER "Llennpie"
+#define REPO_NAME  "Saturn"
 
 int current_screen = 0;
 float download_progress = 0;
