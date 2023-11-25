@@ -12,9 +12,9 @@ LIBS =
 
 ifeq ($(OS),Windows_NT)
 	CFLAGS += -DWINDOWS
-	LIBS += -static $(shell pkg-config --libs --static sdl2 libcurl libcpr)
+	LIBS += -static $(shell pkg-config --libs --static sdl2 libcurl)
 else
-	LIBS += -lSDL2 -lSDL2main -lcurl -lcpr
+	LIBS += -lSDL2 -lSDL2main -lcurl
 endif
 
 .PHONY: all clean

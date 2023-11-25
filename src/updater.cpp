@@ -1,9 +1,9 @@
 #include <SDL2/SDL.h>
 #include "gui.h"
-#include "json_parser.h"
+#include "picojson.h"
 #include "portable_file_dialogs.h"
 #include "main.h"
-#include <cpr/cpr.h>
+#include "downloader.h"
 #include <filesystem>
 #include <iostream>
 #include <fstream>
@@ -33,8 +33,8 @@ typedef void(*DownloadFinishCallback)(bool success);
 #define SCREEN_NO_INTERNET 9
 #define SCREEN_CHOOSE_ROM 10
 
-#define REPO_OWNER "Llennpie"
-#define REPO_NAME  "Saturn"
+#define REPO_OWNER "Dominicentek"
+#define REPO_NAME  "SuperMarioJava"
 
 int current_screen = 0;
 float download_progress = 0;
@@ -66,16 +66,17 @@ void begin_download(std::string url, std::string file, DownloadFinishCallback fi
     download_progress = 0;
     download_finish_callback = finish_callback;
     download_thread = std::thread([](std::string url, std::string file) {
-        cpr::Response response = cpr::Get(cpr::Url { url }, cpr::ProgressCallback([&](cpr::cpr_off_t downloadTotal, cpr::cpr_off_t downloadNow, cpr::cpr_off_t uploadTotal, cpr::cpr_off_t uploadNow, intptr_t userdata) -> bool {
-            download_progress = (float)downloadNow / (float)downloadTotal;
-            return true;
-        }));
-        std::cout << response.status_code << " : " << url << std::endl;
+        Downloader downloader = Downloader(url);
+        downloader.progress([](double now, double total) {
+            download_progress = now / total;
+        });
+        downloader.download();
+        std::cout << downloader.status << " : " << url << std::endl;
         std::filesystem::create_directories(std::filesystem::path(file).parent_path());
-        std::ofstream stream = std::ofstream(file);
-        stream.write(response.text.data(), response.downloaded_bytes);
+        std::ofstream stream = std::ofstream(file, std::ios::binary);
+        stream.write(downloader.data.data(), downloader.data.size());
         stream.close();
-        download_finish_callback(response.status_code == 200);
+        download_finish_callback(downloader.status == 200);
     }, url, file);
 }
 
@@ -89,27 +90,32 @@ bool updater_init() {
 #endif
     std::filesystem::create_directories(saturn_dir);
     if (!std::filesystem::exists(saturn_dir / executable_filename)) {
-        cpr::Response response = cpr::Get(cpr::Url { "https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/113142596" });
-        current_screen = response.status_code == 200 ? SCREEN_INSTALL : SCREEN_NO_INTERNET;
-        if (response.status_code != 200) return false;
-        Json::Value json;
-        json << response.text;
-        latest_download_link = json["assets"][0]["browser_download_url"].asString();
+        Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest");
+        downloader.download();
+        std::ofstream stream = std::ofstream("test.txt");
+        stream.write(downloader.data.data(), downloader.data.size());
+        stream.close();
+        current_screen = downloader.status == 200 ? SCREEN_INSTALL : SCREEN_NO_INTERNET;
+        if (downloader.status != 200) return false;
+        picojson::value json;
+        picojson::parse(json, std::string(downloader.data.data()));
+        latest_download_link = json.get("assets").get(0).get("browser_download_url").get<std::string>();
         std::ofstream out = std::ofstream(saturn_dir / "latest_update_date.txt");
-        std::string publish_date = json["published_at"].asString();
+        std::string publish_date = json.get("published_at").get<std::string>();
         out.write(publish_date.c_str(), publish_date.length());
         out.close();
     }
     else if (std::filesystem::exists(saturn_dir / "no_updates")) return true; 
     else {
-        cpr::Response response = cpr::Get(cpr::Url { "https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest" });
-        if (response.status_code != 200) return true;
-        Json::Value json;
-        json << response.text;
-        release_date = json["published_at"].asString();
+        Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest");
+        downloader.download();
+        if (downloader.status != 200) return true;
+        picojson::value json;
+        picojson::parse(json, std::string(downloader.data.data()));
+        release_date = json.get("published_at").get<std::string>();
         std::time_t release_time = parse_time(release_date);
         bool should_update = false;
-        latest_download_link = json["assets"][0]["browser_download_url"].asString();
+        latest_download_link = json.get("assets").get(0).get("browser_download_url").get<std::string>();
         if (!std::filesystem::exists(saturn_dir / "latest_update_date.txt")) should_update = true;
         else {
             int length = std::filesystem::file_size(saturn_dir / "latest_update_date.txt");
@@ -223,7 +229,11 @@ bool updater() {
                     shell_link->SetPath((saturn_dir / executable_filename).string().c_str());
                     IPersistFile* persist_file;
                     shell_link->QueryInterface(IID_IPersistFile, (LPVOID*)&persist_file);
-                    persist_file->Save((std::to_string(std::getenv("HOMEPATH")) + "/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Saturn.lnk").c_str());
+                    const char* path = (std::string(std::getenv("HOMEPATH")) + "/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Saturn.lnk").c_str();
+                    size_t size = strlen(path) + 1;
+                    wchar_t* wa = new wchar_t[size];
+                    mbstowcs(wa, path, size);
+                    persist_file->Save(wa, 0);
                     persist_file->Release();
                     shell_link->Release();
                     CoUninitialize();
