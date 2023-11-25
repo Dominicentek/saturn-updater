@@ -92,9 +92,6 @@ bool updater_init() {
     if (!std::filesystem::exists(saturn_dir / executable_filename)) {
         Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest");
         downloader.download();
-        std::ofstream stream = std::ofstream("test.txt");
-        stream.write(downloader.data.data(), downloader.data.size());
-        stream.close();
         current_screen = downloader.status == 200 ? SCREEN_INSTALL : SCREEN_NO_INTERNET;
         if (downloader.status != 200) return false;
         picojson::value json;
