@@ -30,3 +30,6 @@ An installer/updater for [Saturn](https://github.com/Llennpie/Saturn)
    ```
   
 3. Run `make` to compile
+### macOS
+macOS isn't supported because nobody cares about macOS
+![susio](https://media.discordapp.net/stickers/868205648813379585.png?size=160&name=Susio)

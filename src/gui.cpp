@@ -1,12 +1,12 @@
 #include <SDL2/SDL.h>
 #include <string>
 
+#include "gui.h"
 #include "main.h"
 #include "font.h"
 
 SDL_Renderer* current_renderer;
 SDL_Texture* font;
-
 
 void gui_init_font() {
     int numPixels = 112 * 84;
@@ -65,9 +65,22 @@ bool gui_button(std::string text, int x, int y, int width, int height) {
     return hovering && mousePressed;
 }
 
-void gui_progress(int x, int y, int width, int height, float progress) {
+void gui_progress(int x, int y, int width, int height, float progress, int text_type, int steps_max) {
+    // a float isn't equal to itself if and only if it's NaN
+    if (progress != progress) progress = 0;
     if (progress < 0) progress = 0;
     if (progress > 1) progress = 1;
     gui_rect(x, y, width, height, 0x2F2F2FFF);
     gui_rect(x, y, width * progress, height, 0x1F9F1FFF);
+    if (text_type == PROGRESS_TEXT_NONE) return;
+    if (text_type == PROGRESS_TEXT_PERCENTAGE) {
+        char buf[7];
+        snprintf(buf, 7, "%.1f%c", progress * 100, '%');
+        gui_text_centered(std::string(buf), x, y, width, height);
+    }
+    else {
+        char buf[1024];
+        snprintf(buf, 1024, "%d/%d", (int)(steps_max * progress), steps_max);
+        gui_text_centered(std::string(buf), x, y, width, height);
+    }
 }
