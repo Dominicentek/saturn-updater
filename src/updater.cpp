@@ -144,7 +144,7 @@ void update_dynos_directory() {
     picojson::array files = json.get<picojson::array>();
     for (int i = 0; i < files.size(); i++) {
         if (files[i].get("download_url").is<picojson::null>()) std::filesystem::create_directories(saturn_dir / DYNOS_DIR / files[i].get("name").get<std::string>());
-        else download_queue_add(files[i].get("download_url").get<std::string>(), (saturn_dir / DYNOS_DIR / files[i].get("name").get<std::string>()).c_str());
+        else download_queue_add(files[i].get("download_url").get<std::string>(), (saturn_dir / DYNOS_DIR / files[i].get("name").get<std::string>()).string().c_str());
     }
 }
 
@@ -320,6 +320,8 @@ bool updater() {
                     IShellLink* shell_link;
                     CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&shell_link);
                     shell_link->SetPath((saturn_dir / updater_filename).string().c_str());
+                    shell_link->SetIconLocation((saturn_dir / executable_filename).string().c_str(), 0);
+                    shell_link->SetWorkingDirectory(saturn_dir.string().c_str());
                     IPersistFile* persist_file;
                     shell_link->QueryInterface(IID_IPersistFile, (LPVOID*)&persist_file);
                     const char* path = (std::string(std::getenv("HOMEPATH")) + "/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Saturn.lnk").c_str();
