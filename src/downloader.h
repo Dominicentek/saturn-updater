@@ -60,7 +60,7 @@ public:
         std::string destfile = std::string(std::getenv("TEMP")) + "/saturn-updater-download-dest.dat";
         if (URLDownloadToFile(NULL, _url.c_str(), destfile.c_str(), 0, this) == S_OK) {
             int filesize = std::filesystem::file_size(destfile);
-            std::ifstream stream = std::ifstream(destfile);
+            std::ifstream stream = std::ifstream(destfile, std::ios::binary);
             char* buf = (char*)malloc(filesize);
             stream.read(buf, filesize);
             stream.close();

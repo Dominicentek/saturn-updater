@@ -76,6 +76,9 @@ std::time_t parse_time(std::string time) {
 }
 
 void run_saturn() {
+#ifndef WINDOWS
+    chdir(saturn_dir.string().c_str());
+#endif
     system((saturn_dir / executable_filename).string().c_str());
 }
 
@@ -142,15 +145,18 @@ void download_queue_begin(DownloadFinishCallback finish_callback) {
     });
 }
 
-void update_dynos_directory() {
-    Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/contents/" DYNOS_DIR "?ref=" REPO_BRANCH);
+void scan_github_directory(std::filesystem::path dest, std::string url) {
+    Downloader downloader = Downloader(url);
     downloader.download();
     picojson::value json;
     picojson::parse(json, std::string(downloader.data.data()));
     picojson::array files = json.get<picojson::array>();
     for (int i = 0; i < files.size(); i++) {
-        if (files[i].get("download_url").is<picojson::null>()) std::filesystem::create_directories(saturn_dir / DYNOS_DIR / files[i].get("name").get<std::string>());
-        else download_queue_add(files[i].get("download_url").get<std::string>(), (saturn_dir / DYNOS_DIR / files[i].get("name").get<std::string>()).string().c_str());
+        if (files[i].get("download_url").is<picojson::null>()) {
+            scan_github_directory(dest / files[i].get("name").get<std::string>(), files[i].get("url").get<std::string>());
+            std::filesystem::create_directories(dest / files[i].get("name").get<std::string>());
+        }
+        else download_queue_add(files[i].get("download_url").get<std::string>(), (dest / files[i].get("name").get<std::string>()).string().c_str());
     }
 }
 
@@ -170,6 +176,16 @@ void saturn_repair() {
     }
 }
 
+void update_begin() {
+    std::ofstream stream = std::ofstream(saturn_dir / "latest_update_date.txt");
+    stream.write(release_date.c_str(), release_date.length());
+    stream.close();
+    download_queue_begin([](bool success) {
+        current_screen = success ? SCREEN_UPDATED : SCREEN_UPDATE_FAILED;
+    });
+    current_screen = SCREEN_UPDATING;
+}
+
 bool updater_init() {
     executable_filename = "saturn";
     updater_filename = "updater";
@@ -182,7 +198,7 @@ bool updater_init() {
 #endif
     std::filesystem::create_directories(saturn_dir);
     if (!std::filesystem::exists(saturn_dir / executable_filename)) {
-        Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest");
+        Downloader downloader = Downloader("https://api.github.com/repos/Dominicentek/saturn-updater/releases/latest");
         downloader.download();
         current_screen = downloader.status == 200 ? SCREEN_INSTALL : SCREEN_NO_INTERNET;
         if (downloader.status != 200) return false;
@@ -192,11 +208,12 @@ bool updater_init() {
         std::string publish_date = json.get("published_at").get<std::string>();
         out.write(publish_date.c_str(), publish_date.length());
         out.close();
-        saturn_repair();
         download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
     }
     else {
         saturn_repair();
+        if (!std::filesystem::exists(saturn_dir / DYNOS_DIR)) scan_github_directory(saturn_dir / DYNOS_DIR, "https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/contents/" DYNOS_DIR "?ref=" REPO_BRANCH);
+        bool force_update = download_queue.size() != 0;
         current_screen = SCREEN_UPDATE;
         if (!std::filesystem::exists(saturn_dir / "no_updates")) {
             Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest");
@@ -218,9 +235,9 @@ bool updater_init() {
                     free(data);
                 }
                 if (should_update) download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
-                update_dynos_directory();
             }
         }
+        if (force_update) update_begin();
     }
     return download_queue.size() == 0;
 }
@@ -253,13 +270,7 @@ bool updater() {
             gui_text_centered("There is an update available", 0, 5, 266, -1);
             should_run_saturn = true;
             if (gui_button("Update",           266 / 2 - 3 - 128, 26, 128, 24)) {
-                std::ofstream stream = std::ofstream(saturn_dir / "latest_update_date.txt");
-                stream.write(release_date.c_str(), release_date.length());
-                stream.close();
-                download_queue_begin([](bool success) {
-                    current_screen = success ? SCREEN_UPDATED : SCREEN_UPDATE_FAILED;
-                });
-                current_screen = SCREEN_UPDATING;
+                update_begin();
             }
             if (gui_button("Don't update",     266 / 2 + 3      , 26, 128, 24)) return true;
             if (gui_button("Remind me later",  266 / 2 - 3 - 128, 56, 128, 24)) {
@@ -314,8 +325,10 @@ bool updater() {
                 if (std::filesystem::exists(saturn_dir / "sm64.z64")) std::filesystem::remove(saturn_dir / "sm64.z64");
                 std::filesystem::copy(file.result()[0], saturn_dir / "sm64.z64");
                 current_screen = SCREEN_INSTALLING;
-                update_dynos_directory();
+                saturn_repair();
+                scan_github_directory(saturn_dir / DYNOS_DIR, "https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/contents/" DYNOS_DIR "?ref=" REPO_BRANCH);
                 char* updater_executable = exe_path();
+                std::filesystem::remove(saturn_dir / updater_filename);
                 std::filesystem::copy_file(updater_executable, saturn_dir / updater_filename);
                 free(updater_executable);
                 download_queue_begin([](bool success) {
