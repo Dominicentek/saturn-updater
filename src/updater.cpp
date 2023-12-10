@@ -198,7 +198,7 @@ bool updater_init() {
 #endif
     std::filesystem::create_directories(saturn_dir);
     if (!std::filesystem::exists(saturn_dir / executable_filename)) {
-        Downloader downloader = Downloader("https://api.github.com/repos/Dominicentek/saturn-updater/releases/latest");
+        Downloader downloader = Downloader("https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/releases/latest");
         downloader.download();
         current_screen = downloader.status == 200 ? SCREEN_INSTALL : SCREEN_NO_INTERNET;
         if (downloader.status != 200) return false;
