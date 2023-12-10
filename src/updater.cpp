@@ -45,6 +45,12 @@ typedef void(*DownloadFinishCallback)(bool success);
 #define FONT_FILE        "fonts/forkawesome-webfont.ttf"
 #define DYNOS_DIR        "dynos"
 
+#ifdef WINDOWS
+#define RELEASE_INDEX 0
+#else
+#define RELEASE_INDEX 1
+#endif
+
 int current_screen = 0;
 int current_queue_entry = 0;
 int queue_entries = 0;
@@ -187,7 +193,7 @@ bool updater_init() {
         out.write(publish_date.c_str(), publish_date.length());
         out.close();
         saturn_repair();
-        download_queue_add(json.get("assets").get(0).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+        download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
     }
     else {
         saturn_repair();
@@ -211,7 +217,7 @@ bool updater_init() {
                     should_update = release_time > current_time;
                     free(data);
                 }
-                if (should_update) download_queue_add(json.get("assets").get(0).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+                if (should_update) download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
                 update_dynos_directory();
             }
         }
