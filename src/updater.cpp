@@ -79,23 +79,6 @@ void run_saturn() {
     system((saturn_dir / executable_filename).string().c_str());
 }
 
-void begin_download(std::string url, std::string file, DownloadFinishCallback finish_callback) {
-    download_progress = 0;
-    download_finish_callback = finish_callback;
-    download_thread = std::thread([](std::string url, std::string file) {
-        Downloader downloader = Downloader(url);
-        downloader.progress([](double now, double total) {
-            download_progress = now / total;
-        });
-        downloader.download();
-        std::filesystem::create_directories(std::filesystem::path(file).parent_path());
-        std::ofstream stream = std::ofstream(file, std::ios::binary);
-        stream.write(downloader.data.data(), downloader.data.size());
-        stream.close();
-        download_finish_callback(downloader.status == 200);
-    }, url, file);
-}
-
 char* exe_path() {
 #ifdef WINDOWS
     char* buf = (char*)malloc(MAX_PATH);
