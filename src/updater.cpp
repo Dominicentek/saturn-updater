@@ -150,7 +150,6 @@ void saturn_repair() {
             if (buf[0] == '$') continue;
 #endif
             if (buf[0] == '>') {
-                std::cout << "Redirect found" << std::endl;
                 std::vector<std::string> split = {};
                 std::string segment = "";
                 std::stringstream stream = std::stringstream(link);
