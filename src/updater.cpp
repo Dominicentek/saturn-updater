@@ -41,9 +41,6 @@ typedef void(*DownloadFinishCallback)(bool success);
 #define REPO_OWNER       "Llennpie"
 #define REPO_NAME        "Saturn"
 #define REPO_BRANCH      "legacy"
-#define DISCORD_SDK_PATH "lib/discordsdk"
-#define FONT_FILE        "fonts/forkawesome-webfont.ttf"
-#define DYNOS_DIR        "dynos"
 
 #ifdef WINDOWS
 #define RELEASE_INDEX 0
@@ -91,7 +88,6 @@ void begin_download(std::string url, std::string file, DownloadFinishCallback fi
             download_progress = now / total;
         });
         downloader.download();
-        std::cout << downloader.status << " : " << url << std::endl;
         std::filesystem::create_directories(std::filesystem::path(file).parent_path());
         std::ofstream stream = std::ofstream(file, std::ios::binary);
         stream.write(downloader.data.data(), downloader.data.size());
@@ -130,7 +126,6 @@ void download_queue_begin(DownloadFinishCallback finish_callback) {
                 download_progress = now / total;
             });
             downloader.download();
-            std::cout << downloader.status << " : " << entry.first << std::endl;
             if (downloader.status != 200) {
                 download_finish_callback(false);
                 return;
@@ -145,34 +140,55 @@ void download_queue_begin(DownloadFinishCallback finish_callback) {
     });
 }
 
-void scan_github_directory(std::filesystem::path dest, std::string url) {
-    Downloader downloader = Downloader(url);
-    downloader.download();
-    picojson::value json;
-    picojson::parse(json, std::string(downloader.data.data()));
-    picojson::array files = json.get<picojson::array>();
-    for (int i = 0; i < files.size(); i++) {
-        if (files[i].get("download_url").is<picojson::null>()) {
-            scan_github_directory(dest / files[i].get("name").get<std::string>(), files[i].get("url").get<std::string>());
-            std::filesystem::create_directories(dest / files[i].get("name").get<std::string>());
-        }
-        else download_queue_add(files[i].get("download_url").get<std::string>(), (dest / files[i].get("name").get<std::string>()).string().c_str());
-    }
-}
-
-std::vector<std::pair<std::string, std::string>> required_files = {
-    { FONT_FILE, FONT_FILE },
-#ifdef WINDOWS
-    { "lib/discordsdk/discord_game_sdk.dll", "discord_game_sdk.dll" }
-#else
-    { "lib/discordsdk/libdiscord_game_sdk.so", "libdiscord_game_sdk.so" },
-#endif
-};
-
 void saturn_repair() {
-    for (auto& required_file : required_files) {
-        if (std::filesystem::exists(saturn_dir / required_file.second)) continue;
-        download_queue_add("https://github.com/" REPO_OWNER "/" REPO_NAME "/raw/" REPO_BRANCH "/" + required_file.first, (saturn_dir / required_file.second).string());
+    std::string url_prefix = "https://raw.githubusercontent.com/" REPO_OWNER "/" REPO_NAME "/" REPO_BRANCH "/";
+    Downloader downloader = Downloader(url_prefix + "dependencies.txt");
+    downloader.download();
+    if (downloader.status != 200) return;
+    std::string data = std::string(downloader.data.data());
+    int ptr = 0;
+    int bufptr = 0;
+    char buf[256];
+    std::vector<std::pair<std::string, std::string>> redirects = {};
+    std::vector<std::string> links = {};
+    while (true) {
+        char character = data[ptr++];
+        if (character == 0) break;
+        if (character == 13) continue;
+        if (character == 10 || bufptr == 255) {
+            if (bufptr == 0) continue;
+            buf[bufptr++] = 0;
+            bufptr = 0;
+            if (buf[0] == '#') continue;
+            std::string link = std::string(buf + 2);
+#ifdef WINDOWS
+            if (buf[0] == '%') continue;
+#else
+            if (buf[0] == '$') continue;
+#endif
+            if (buf[0] == '>') {
+                std::cout << "Redirect found" << std::endl;
+                std::vector<std::string> split = {};
+                std::string segment = "";
+                std::stringstream stream = std::stringstream(link);
+                while (std::getline(stream, segment, ';')) {
+                    split.push_back(segment);
+                }
+                redirects.push_back({ split[0], split[1] });
+            }
+            else links.push_back(link);
+        }
+        else buf[bufptr++] = character;
+    }
+    for (std::string link : links) {
+        std::string file = std::string(link.c_str() + url_prefix.length() - 1);
+        for (auto redirect : redirects) {
+            if (file.find(redirect.first) != 0) continue;
+            file = redirect.second + "/" + file.substr(redirect.first.length());
+            break;
+        }
+        if (std::filesystem::exists(saturn_dir / file)) continue;
+        download_queue_add(link, (saturn_dir / file).string());
     }
 }
 
@@ -208,11 +224,10 @@ bool updater_init() {
         std::string publish_date = json.get("published_at").get<std::string>();
         out.write(publish_date.c_str(), publish_date.length());
         out.close();
-        download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+        download_queue_add(json.get("assets").get(0).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
     }
     else {
         saturn_repair();
-        if (!std::filesystem::exists(saturn_dir / DYNOS_DIR)) scan_github_directory(saturn_dir / DYNOS_DIR, "https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/contents/" DYNOS_DIR "?ref=" REPO_BRANCH);
         bool force_update = download_queue.size() != 0;
         current_screen = SCREEN_UPDATE;
         if (!std::filesystem::exists(saturn_dir / "no_updates")) {
@@ -326,7 +341,6 @@ bool updater() {
                 std::filesystem::copy(file.result()[0], saturn_dir / "sm64.z64");
                 current_screen = SCREEN_INSTALLING;
                 saturn_repair();
-                scan_github_directory(saturn_dir / DYNOS_DIR, "https://api.github.com/repos/" REPO_OWNER "/" REPO_NAME "/contents/" DYNOS_DIR "?ref=" REPO_BRANCH);
                 char* updater_executable = exe_path();
                 std::filesystem::remove(saturn_dir / updater_filename);
                 std::filesystem::copy_file(updater_executable, saturn_dir / updater_filename);

@@ -55,10 +55,16 @@ public:
         progress_callback = callback;
     }
     void download() {
+        std::cout << _url << "..." << std::flush;
         data.clear();
+        std::string url = "";
+        for (int i = 0; i < _url.length(); i++) {
+            if (_url[i] == ' ') url += "%20";
+            else url += _url[i];
+        }
 #ifdef WINDOWS
         std::string destfile = std::string(std::getenv("TEMP")) + "/saturn-updater-download-dest.dat";
-        if (URLDownloadToFile(NULL, _url.c_str(), destfile.c_str(), 0, this) == S_OK) {
+        if (URLDownloadToFile(NULL, url.c_str(), destfile.c_str(), 0, this) == S_OK) {
             int filesize = std::filesystem::file_size(destfile);
             std::ifstream stream = std::ifstream(destfile, std::ios::binary);
             char* buf = (char*)malloc(filesize);
@@ -72,7 +78,7 @@ public:
         else status = 0;
 #else
         CURL* curl = curl_easy_init();
-        curl_easy_setopt(curl, CURLOPT_URL, _url.c_str());
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, &libcurl_progress);
         curl_easy_setopt(curl, CURLOPT_XFERINFODATA, this);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &libcurl_write);
@@ -88,5 +94,6 @@ public:
         curl_easy_cleanup(curl);
         curl_slist_free_all(header);
 #endif
+        std::cout << status << std::endl;
     }
 };
