@@ -329,8 +329,8 @@ bool updater() {
                 free(updater_executable);
                 download_queue_begin([](bool success) {
                     current_screen = success ? SCREEN_INSTALLED : SCREEN_INSTALL_FAILED;
-#ifdef WINDOWS
                     if (!success) return;
+#ifdef WINDOWS
                     CoInitialize(nullptr);
                     IShellLink* shell_link;
                     CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&shell_link);
@@ -347,6 +347,23 @@ bool updater() {
                     persist_file->Release();
                     shell_link->Release();
                     CoUninitialize();
+#else
+                    std::filesystem::path desktop_path = saturn_dir.parent_path() / "applications" / "saturn.desktop";
+                    std::filesystem::create_directories(desktop_path.parent_path());
+                    std::ofstream desktop_stream = std::ofstream(desktop_path, std::ios::binary);
+                    std::stringstream desktop_content = std::stringstream();
+                    desktop_content << "[Desktop Entry]" << "\n";
+                    desktop_content << "Name=Saturn" << "\n";
+                    desktop_content << "Comment=A cross-platform, all-in-one machinima studio for Super Mario 64." << "\n";
+                    desktop_content << "Exec=" << (saturn_dir / updater_filename) << "\n";
+                    desktop_content << "Icon=" << (saturn_dir / "res" / "saturn-linuxicon.png") << "\n";
+                    desktop_content << "Path=" << saturn_dir << "\n";
+                    desktop_content << "Terminal=false" << "\n";
+                    desktop_content << "Type=false" << "\n";
+                    desktop_content << "Categories=Game" << "\n";
+                    std::string str = desktop_content.str();
+                    desktop_stream.write(str.data(), str.length());
+                    desktop_stream.close();
 #endif
                 });
             }
