@@ -73,10 +73,19 @@ std::time_t parse_time(std::string time) {
 }
 
 void run_saturn() {
-#ifndef WINDOWS
-    chdir(saturn_dir.string().c_str());
+#ifdef WINDOWS
+    STARTUPINFO si = {};
+    PROCESS_INFORMATION pi = {};
+    si.cb = sizeof(si);
+    SetCurrentDirectory(saturn_dir.string().c_str());
+    CreateProcessA(nullptr, executable_filename.data(), nullptr, nullptr, false, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+#else
+    std::filesystem::current_path(saturn_dir);
+    std::system(executable_filename.c_str());
 #endif
-    system((saturn_dir / executable_filename).string().c_str());
 }
 
 char* exe_path() {
