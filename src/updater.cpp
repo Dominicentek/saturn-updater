@@ -42,12 +42,6 @@ typedef void(*DownloadFinishCallback)(bool success);
 #define REPO_NAME        "Saturn"
 #define REPO_BRANCH      "legacy"
 
-#ifdef WINDOWS
-#define RELEASE_INDEX 0
-#else
-#define RELEASE_INDEX 1
-#endif
-
 int current_screen = 0;
 int current_queue_entry = 0;
 int queue_entries = 0;
@@ -84,7 +78,7 @@ void run_saturn() {
     CloseHandle(pi.hThread);
 #else
     std::filesystem::current_path(saturn_dir);
-    std::system(executable_filename.c_str());
+    std::system((saturn_dir / executable_filename).c_str());
 #endif
 }
 
@@ -215,7 +209,17 @@ bool updater_init() {
         std::string publish_date = json.get("published_at").get<std::string>();
         out.write(publish_date.c_str(), publish_date.length());
         out.close();
-        download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+        for (auto& asset : json.get("assets").get<picojson::array>()) {
+            std::string name = asset.get("name").get<std::string>();
+#ifdef WINDOWS
+            if (name == "update-win64.exe") {
+#else
+            if (name == "update-linux64") {
+#endif
+                download_queue_add(asset.get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+                break;
+            }
+        }
     }
     else {
         saturn_repair();
@@ -240,7 +244,19 @@ bool updater_init() {
                     should_update = release_time > current_time;
                     free(data);
                 }
-                if (should_update) download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+                if (should_update) {
+                    for (auto& asset : json.get("assets").get<picojson::array>()) {
+                        std::string name = asset.get("name").get<std::string>();
+#ifdef WINDOWS
+                        if (name == "update-win64.exe") {
+#else
+                        if (name == "update-linux64") {
+#endif
+                            download_queue_add(asset.get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+                            break;
+                        }
+                    }
+                }
             }
         }
         if (force_update) update_begin();
