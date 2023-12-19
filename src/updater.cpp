@@ -172,7 +172,7 @@ void saturn_repair() {
         else buf[bufptr++] = character;
     }
     for (std::string link : links) {
-        std::string file = std::string(link.c_str() + url_prefix.length() - 1);
+        std::string file = std::string(link.c_str() + url_prefix.length());
         for (auto redirect : redirects) {
             if (file.find(redirect.first) != 0) continue;
             file = redirect.second + "/" + file.substr(redirect.first.length());
@@ -215,7 +215,7 @@ bool updater_init() {
         std::string publish_date = json.get("published_at").get<std::string>();
         out.write(publish_date.c_str(), publish_date.length());
         out.close();
-        download_queue_add(json.get("assets").get(0).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
+        download_queue_add(json.get("assets").get(RELEASE_INDEX).get("browser_download_url").get<std::string>(), (saturn_dir / executable_filename).string());
     }
     else {
         saturn_repair();
