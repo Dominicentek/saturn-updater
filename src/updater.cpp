@@ -380,11 +380,10 @@ bool updater() {
                     desktop_content << "[Desktop Entry]" << "\n";
                     desktop_content << "Name=Saturn" << "\n";
                     desktop_content << "Comment=A cross-platform, all-in-one machinima studio for Super Mario 64." << "\n";
-                    desktop_content << "Exec=" << (saturn_dir / updater_filename) << "\n";
-                    desktop_content << "Icon=" << (saturn_dir / "res" / "saturn-linuxicon.png") << "\n";
-                    desktop_content << "Path=" << saturn_dir << "\n";
+                    desktop_content << "Exec=" << (saturn_dir / updater_filename).string() << "\n";
+                    desktop_content << "Icon=" << (saturn_dir / "res" / "saturn-linuxicon.png").string() << "\n";
+                    desktop_content << "Path=" << (saturn_dir).string() << "\n";
                     desktop_content << "Terminal=false" << "\n";
-                    desktop_content << "Type=false" << "\n";
                     desktop_content << "Categories=Game" << "\n";
                     std::string str = desktop_content.str();
                     desktop_stream.write(str.data(), str.length());
