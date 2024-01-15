@@ -182,6 +182,7 @@ void update_begin() {
     stream.write(release_date.c_str(), release_date.length());
     stream.close();
     download_queue_begin([](bool success) {
+        system(("chmod +x " + (saturn_dir / executable_filename).string()).c_str());
         current_screen = success ? SCREEN_UPDATED : SCREEN_UPDATE_FAILED;
     });
     current_screen = SCREEN_UPDATING;
