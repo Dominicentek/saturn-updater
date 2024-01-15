@@ -373,6 +373,7 @@ bool updater() {
                     shell_link->Release();
                     CoUninitialize();
 #else
+                    system(("chmod +x \"" + (saturn_dir / executable_filename).string() + "\"").c_str());
                     std::filesystem::path desktop_path = saturn_dir.parent_path() / "applications" / "saturn.desktop";
                     std::filesystem::create_directories(desktop_path.parent_path());
                     std::ofstream desktop_stream = std::ofstream(desktop_path, std::ios::binary);
